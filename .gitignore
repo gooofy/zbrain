@@ -5,3 +5,9 @@ syntax: glob
 *.pyc
 tmp
 old
+Dynamic-Memory-Networks-in-TensorFlow/
+bin/
+gru/
+include/
+lib/
+lib64
