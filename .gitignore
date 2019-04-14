@@ -11,3 +11,8 @@ gru/
 include/
 lib/
 lib64
+data/fasttext/
+data/kb/
+data/training/
+share/
+src

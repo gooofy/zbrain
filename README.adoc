@@ -1,0 +1,148 @@
+
+Architecture
+============
+
+Open Domain QA Chat Bot
+
+                        +------------------+                                                        +------------------------------+
+                        | Dialog Line    1 |                                                        |       Knowledge Base         |
+                        | Dialog Line    2 |           +--------------------+                       +------------------------------+
+                        | ...              |---------> | DeepNN_Context_Vec |                       | 0.1 0.2 0.01 ... | KB Line 1 |
+                        | Dialog Line    n |           +--------------------+                       | ...              |           |
+                        +------------------+                     |                                  | 0.33 0.1 0.5 ... | KB Line m |
+                        | Current Input    |                     |                                  +------------------------------+
+                        +------------------+                     |                                                 | 
+                                 |                               |                                                 |
+                                 |                               |        +----------------------------------------+
+                                 |                               |        |
+                                 |                               |        |
+                                 |                               v        v
+                                 |                     +---------------------------+          
+                                 |                     | Nearest Neighbour search  |
+                                 |                     +---------------------------+
+                                 |                                   |
+                                 |                                   |
+                                 |                                   v
+                                 |                  +--------------------------------+
+                                 |                  |         KB Context Lines       |
+                                 |                  +--------------------------------+
+                                 |                  | 0.4 0.2 0.9 ... Context line 1 |
+                                 |                  | ...                            |
+                                 |                  | 0.8 0.2 0.4 ... Context line k |
+                                 |                  +--------------------------------+
+                                 |                                   |
+                                 |                                   |
+                                 |      +----------------------------+
+                                 |      |                             
+                                 |      |                             
+                                 v      v
+                          +-----------------------+
+                          | Context Line 1        |
+                          | ...                   |
+                          | Context Line k        |
+                          +-----------------------+
+                          | Dialog Line 1         |
+                          | ...                   |
+                          | Dialog Line n         |
+                          +-----------------------+
+                          | Current Input         |
+                          +-----------------------+
+                                     | 
+                                     |
+                                     v
+                              +-------------+
+                              |  DeepNN_QA  |
+                              +-------------+
+                                     |
+                                     |
+                              +-------------+
+                              |   Response  |
+                              +-------------+
+
+
+[ Knowledge + Dialog History + Current Input ] -> [ Response ]
+
+
+
+
+
+
+
+
+
+Knowledge Base
+--------------
+
+
+
+Dialog
+------
+
+
+
+
+Datasets
+========
+
+Dialog Corpora
+--------------
+
+* SQuAD 2.0
+* CoQA
+* SQuAD 1.1
+* MC Test
+* DeepMind CNN/DM http://www.github.com/deepmind/rc-data/
+* MS MARCO http://www.msmarco.org/
+* TriviaQA
+* NewsQA 
+* NarrativeQA https://github.com/deepmind/narrativeqa
+* HotpotQA
+* natural_questions
+* QuestionBank
+* WebQuestions
+* wordrobe20140627.csv.gz
+* YahooAnswers
+* CommonsenseQA
+* ComplexWebQuestions
+* bAbI
+
+Chat Corpora
+------------
+
+* chat_corpus
+* chatterbot-logs
+* cornell_movie_dialogs_corpus
+* cornell_movie_quotes_corpus.zip
+* Microsoft Research Social Media Conversation Corpus
+* swb1_dialogact_annot.tar.gz
+* The Ubuntu Dialogue Corpus v1.0
+* AIML bots
+* Zamia AI
+
+Knowledge
+---------
+
+* WikiData
+* conceptnet5
+* framenet_v15
+* HappyDB
+* linkedgeodata
+* nell
+* opencyc
+* SemLink
+* SUMO
+* UMBEL
+* weather
+* wordnet
+
+AI Architecture Survey
+----------------------
+
+* BERT
+  https://arxiv.org/pdf/1901.08634.pdf
+* How does TF's universal sentence encoder work?
+* Transformer https://arxiv.org/pdf/1706.03762.pdf
+  https://www.tensorflow.org/alpha/tutorials/sequences/transformer
+* SDNet https://arxiv.org/pdf/1812.03593.pdf
+
+
