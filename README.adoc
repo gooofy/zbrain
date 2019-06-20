@@ -5,10 +5,10 @@ Architecture
 Open Domain QA Chat Bot
 
                         +------------------+                                                        +------------------------------+
-                        | Dialog Line    1 |                                                        |       Knowledge Base         |
-                        | Dialog Line    2 |           +--------------------+                       +------------------------------+
+                        | Dialog Ctx     1 |                                                        |       Knowledge Base         |
+                        | Dialog Ctx     2 |           +--------------------+                       +------------------------------+
                         | ...              |---------> | DeepNN_Context_Vec |                       | 0.1 0.2 0.01 ... | KB Line 1 |
-                        | Dialog Line    n |           +--------------------+                       | ...              |           |
+                        | Dialog Ctx     n |           +--------------------+                       | ...              |           |
                         +------------------+                     |                                  | 0.33 0.1 0.5 ... | KB Line m |
                         | Current Input    |                     |                                  +------------------------------+
                         +------------------+                     |                                                 | 
@@ -26,9 +26,9 @@ Open Domain QA Chat Bot
                                  |                  +--------------------------------+
                                  |                  |         KB Context Lines       |
                                  |                  +--------------------------------+
-                                 |                  | 0.4 0.2 0.9 ... Context line 1 |
+                                 |                  | 0.4 0.2 0.9 ... Info    line 1 |
                                  |                  | ...                            |
-                                 |                  | 0.8 0.2 0.4 ... Context line k |
+                                 |                  | 0.8 0.2 0.4 ... Info    line k |
                                  |                  +--------------------------------+
                                  |                                   |
                                  |                                   |
@@ -37,13 +37,13 @@ Open Domain QA Chat Bot
                                  |      |                             
                                  v      v
                           +-----------------------+
-                          | Context Line 1        |
+                          | Info    Line 1        |
                           | ...                   |
-                          | Context Line k        |
+                          | Info    Line k        |
                           +-----------------------+
-                          | Dialog Line 1         |
+                          | Ctx     Line 1        |
                           | ...                   |
-                          | Dialog Line n         |
+                          | Ctx     Line n        |
                           +-----------------------+
                           | Current Input         |
                           +-----------------------+
@@ -63,13 +63,6 @@ Open Domain QA Chat Bot
 [ Knowledge + Dialog History + Current Input ] -> [ Response ]
 
 
-
-
-
-
-
-
-
 Knowledge Base
 --------------
 
@@ -77,6 +70,14 @@ Knowledge Base
 
 Dialog
 ------
+
+DS_i -> data/qa_src/DS_i/#########.json  \
+DS_j -> data/qa_src/DS_j/#########.json  | 
+     .                                    \  data/qa_enc/train/#########.json
+     .                                    /  data/qa_enc/val/#########.json
+     .                                   |
+DS_n -> data/qa_src/DS_n/#########.json  /
+
 
 
 
@@ -86,6 +87,11 @@ Datasets
 
 Dialog Corpora
 --------------
+
+* TWITTER
+* personachat
+* slashdot
+* reddit
 
 * SQuAD 2.0
 * CoQA
@@ -109,15 +115,22 @@ Dialog Corpora
 Chat Corpora
 ------------
 
-* chat_corpus
-* chatterbot-logs
-* cornell_movie_dialogs_corpus
-* cornell_movie_quotes_corpus.zip
-* Microsoft Research Social Media Conversation Corpus
-* swb1_dialogact_annot.tar.gz
-* The Ubuntu Dialogue Corpus v1.0
-* AIML bots
-* Zamia AI
+*          Zamia AI
+*   74M    AIML bots
+*  142M    chat_corpus
+           https://github.com/Marsan-Ma-zz/chat_corpus
+           https://github.com/Marsan-Ma/twitter_scraper
+
+           34M open subtitles
+           21M twitter_en
+*   41M    cornell_movie_dialogs_corpus
+*   33M    cornell_movie_quotes_corpus.zip
+*    0.2M  Microsoft Research Social Media Conversation Corpus
+*    4.3M  swb1_dialogact_annot.tar.gz
+* 7800M    The Ubuntu Dialogue Corpus v1.0
+*          NPS Chat Corpus (NLTK)
+*          Internet archive Twitter stream https://archive.org/search.php?query=collection%3Atwitterstream&sort=-publicdate&page=2
+*   58M    chatterbot-logs
 
 Knowledge
 ---------
@@ -138,6 +151,10 @@ Knowledge
 AI Architecture Survey
 ----------------------
 
+* OpenAI GPT-2
+    * How to build a State-of-the-Art Conversational AI with Transfer Learning
+      https://medium.com/huggingface/how-to-build-a-state-of-the-art-conversational-ai-with-transfer-learning-2d818ac26313
+    
 * BERT
   https://arxiv.org/pdf/1901.08634.pdf
 * How does TF's universal sentence encoder work?
