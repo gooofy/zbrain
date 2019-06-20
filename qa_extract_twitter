@@ -1,0 +1,202 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+#
+# Copyright 2019 Guenter Bartsch
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
+
+import os
+import sys
+import codecs
+import time
+import json
+import logging
+import requests
+from readability import Document
+from bs4 import BeautifulSoup
+
+from optparse import OptionParser
+from nltools  import misc
+
+import twint
+
+PROC_TITLE        = 'qa_extract_twitter'
+
+TWITTER_DUMPFN    = '/home/bofh/projects/ai/data/corpora/en/twitter/corpus/d2/6a/d26a633de579000.json'
+TWITTER_CORPUSFN  = '/home/bofh/projects/ai/data/corpora/en/twitter/corpus'
+
+TWITTER_DIRFN     = 'data/qa_src/twitter'
+
+# DEBUG_LIMIT       = 100
+DEBUG_LIMIT       = 0
+
+BLOCKLIST         = ['wapo.st', 'washingtonpost.com']
+
+#
+# init
+#
+
+misc.init_app(PROC_TITLE)
+
+#
+# commandline
+#
+
+parser = OptionParser("usage: %prog [options]")
+
+parser.add_option ("-v", "--verbose", action="store_true", dest="verbose",
+                   help="verbose output")
+
+(options, args) = parser.parse_args()
+
+if options.verbose:
+    logging.getLogger().setLevel(logging.DEBUG)
+else:
+    logging.getLogger().setLevel(logging.INFO)
+
+# readability.readability
+
+logging.getLogger("readability").setLevel(logging.WARNING)
+# logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+
+#
+# cleanup / preparation
+#
+ 
+# cmd = 'rm -rf %s' % QA_DIRFN
+# logging.info(cmd)
+# os.system(cmd)
+ 
+cmd = 'mkdir -p %s' % TWITTER_DIRFN
+logging.info(cmd)
+os.system(cmd)
+
+#
+# find files
+#
+
+ls_files = []
+
+for ls_a in os.listdir(TWITTER_CORPUSFN):
+    for ls_b in os.listdir('%s/%s' % (TWITTER_CORPUSFN, ls_a)):
+        for ls_f in os.listdir('%s/%s/%s' % (TWITTER_CORPUSFN, ls_a, ls_b)):
+            ls_files.append('%s/%s/%s/%s' % (TWITTER_CORPUSFN, ls_a, ls_b, ls_f))
+
+            if len(ls_files) % 100 == 0:
+                logging.info ('%7d files...' % len(ls_files))
+
+            if DEBUG_LIMIT and (len(ls_files)>=DEBUG_LIMIT):
+                logging.warning('DEBUG_LIMIT reached at %d files.' % len(ls_files))
+                break
+        if DEBUG_LIMIT and (len(ls_files)>=DEBUG_LIMIT):
+            break
+    if DEBUG_LIMIT and (len(ls_files)>=DEBUG_LIMIT):
+        break
+
+logging.info('found %d files.' % len(ls_files))
+
+#
+# load tweets
+#
+
+ls_files
+
+fncnt=0
+for twitter_dumpfn in ls_files:
+
+    fncnt += 1
+
+    try:
+        with open(twitter_dumpfn, 'r') as dumpf:
+            data = json.loads(dumpf.read())
+        if len(data['comments'])==0:
+            continue
+
+        jsonfn = '%s/%s.json' % (TWITTER_DIRFN, data['id'])
+        if os.path.exists(jsonfn):
+            continue
+
+        url = data['textUrl'] if 'textUrl' in data else ''
+
+        text = ''
+
+        if url:
+
+            skip = False
+            for blocked_url in BLOCKLIST:
+                if blocked_url in url:
+                    skip = True
+            if skip:
+                continue
+
+            logging.info ('%7d/%7d %s %s ... ' % (fncnt, len(ls_files), data['user'], url))
+            response = requests.get(url, verify=True, timeout=7)
+            # response.text
+            doc = Document(response.text)
+            doc.title()
+            html = doc.summary()
+
+            # html
+
+            soup = BeautifulSoup(html)
+
+            # kill all script and style elements
+            for script in soup(["script", "style"]):
+                script.extract()    # rip it out
+
+            # get text
+            text = soup.get_text()
+
+            # break into lines and remove leading and trailing space on each
+            lines = (line.strip() for line in text.splitlines())
+            # break multi-headlines into a line each
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            # drop blank lines
+            text = '\n'.join(chunk for chunk in chunks if chunk)
+
+            # text
+
+        # text
+
+        if text:
+            ds = {'info': text, 'dlg': [data['text']]}
+        else:
+            ds = {'info': data['text'], 'dlg': []}
+
+        fav = 0
+        for c in data['comments']:
+            if c['favorites'] == 0:
+                continue
+            ds['dlg'].append(c['text'])
+            fav += 1
+
+        if (not text) and (fav == 0):
+            continue
+
+        # print(repr(ds))
+
+        with open(jsonfn, 'w') as jsonf:
+            jsonf.write(json.dumps(ds))
+
+        logging.info ('%7d/%7d %s written. %s %s' % (fncnt, len(ls_files), jsonfn, data['user'], url[:30]))
+
+    except:
+        logging.exception('exception caught %s' % repr(data))
+
+ds
+data
+

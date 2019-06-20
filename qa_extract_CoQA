@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+#
+# Copyright 2019 Guenter Bartsch
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
+
+import os
+import sys
+import codecs
+import time
+import json
+import logging
+import random
+import re
+
+from optparse import OptionParser
+from nltools  import misc
+
+PROC_TITLE        = 'qa_extract_CoQA'
+
+COQA_TRAIN        = '/home/bofh/projects/ai/data/corpora/en/CoQA/coqa-train-v1.0.json'
+COQA_DEV          = '/home/bofh/projects/ai/data/corpora/en/CoQA/coqa-dev-v1.0.json'
+
+QA_DIRFN          = 'data/qa_src/CoQA'
+
+#
+# init
+#
+
+misc.init_app(PROC_TITLE)
+
+#
+# commandline
+#
+
+parser = OptionParser("usage: %prog [options]")
+
+parser.add_option ("-v", "--verbose", action="store_true", dest="verbose",
+                   help="verbose output")
+
+(options, args) = parser.parse_args()
+
+if options.verbose:
+    logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(level=logging.INFO)
+
+#
+# cleanup / preparation
+#
+
+cmd = 'rm -rf %s' % QA_DIRFN
+logging.info(cmd)
+os.system(cmd)
+
+cmd = 'mkdir -p %s' % QA_DIRFN
+logging.info(cmd)
+os.system(cmd)
+
+#
+# load corpus
+#
+
+cnt = 0
+
+for srcfn in [COQA_DEV, COQA_TRAIN]:
+
+    logging.info('loading %s...' % srcfn)
+
+    data = json.loads(open(srcfn, 'r').read())
+
+    for sample in data['data']:
+
+        # print(sample)
+
+        with open('%s/%09d.json' % (QA_DIRFN, cnt), 'w') as outf:
+
+            ds = {'info': sample['story'], 'dlg':[]}
+
+            turn_id = 0
+
+            for q in sample['questions']:
+                turn_id += 1
+                if q['turn_id'] != turn_id:
+                    logging.error('turn id mismatch in question #%d!' % cnt)
+                    sys.exit(1)
+
+                a = sample['answers'][turn_id-1]
+                if a['turn_id'] != turn_id:
+                    logging.error('turn id mismatch in answer #%d!' % cnt)
+                    sys.exit(1)
+
+                ds['dlg'].append({'q': q['input_text'], 'a': a['input_text']})
+
+            outf.write(json.dumps(ds))
+            cnt += 1
+
+            if cnt % 100 == 0:
+                logging.info ('%5d samples...' % cnt)
+
+    logging.info('loading %s... done.' % srcfn)
+
