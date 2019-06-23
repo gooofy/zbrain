@@ -154,12 +154,16 @@ AI Architecture Survey
 * OpenAI GPT-2
     * How to build a State-of-the-Art Conversational AI with Transfer Learning
       https://medium.com/huggingface/how-to-build-a-state-of-the-art-conversational-ai-with-transfer-learning-2d818ac26313
-    
+   
+    * python newspaper article extractor https://github.com/codelucas/newspaper
+
+    * OpenWebText https://github.com/jcpeterson/openwebtext
+      https://pushshift.io/  http://files.pushshift.io/reddit/
+ 
 * BERT
   https://arxiv.org/pdf/1901.08634.pdf
 * How does TF's universal sentence encoder work?
 * Transformer https://arxiv.org/pdf/1706.03762.pdf
   https://www.tensorflow.org/alpha/tutorials/sequences/transformer
 * SDNet https://arxiv.org/pdf/1812.03593.pdf
-
 
