@@ -1,4 +1,22 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+#
+# Copyright 2019 Guenter Bartsch
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
 
 import argparse
 import json
@@ -6,19 +24,17 @@ import os
 import time
 import sys
 import logging
-
-from readability import Document
-from bs4 import BeautifulSoup
-
 import requests
 
+from readability import Document
+from bs4         import BeautifulSoup
+
 import numpy      as np
+
 import tensorflow as tf
 from tensorflow.core.protobuf import rewriter_config_pb2
+from gpt2                     import model, sample, encoder
 
-from gpt2 import model, sample, encoder
-
-# CHECKPOINT_DIR = 'checkpoint'
 CHECKPOINT_DIR     = 'engines/gpt-2/checkpoint'
 SAMPLE_DIR         = 'samples'
 
@@ -28,14 +44,12 @@ SEPARATOR_ANSWER   = '<|answer|>'
 
 parser = argparse.ArgumentParser( description='generate twitter comments using a GPT-2 model.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument('tweet_url', metavar='TWEETURL', type=str, help='Tweet URL')
+# parser.add_argument('tweet_url', metavar='TWEETURL', type=str, help='Tweet URL')
 
 parser.add_argument('--model_name', metavar='MODEL', type=str, default='117M', help='Pretrained model name')
 parser.add_argument('--restore_from', type=str, default='latest', help='Either "latest", "fresh", or a path to a checkpoint file')
 parser.add_argument('--run_name', type=str, default='run1', help='Run id. Name of subdirectory in checkpoint/ and samples/')
-parser.add_argument('--sample_length', metavar='TOKENS', type=int, default=1023, help='Sample this many tokens')
-
-parser.add_argument('--url', metavar='URL', type=str, default=None, help='article link')
+parser.add_argument('--sample_length', metavar='TOKENS', type=int, default=500, help='Sample this many tokens')
 
 args = parser.parse_args()
 
@@ -44,14 +58,13 @@ logging.getLogger("readability").setLevel(logging.WARNING)
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-enc = encoder.get_encoder(args.model_name)
+enc     = encoder.get_encoder(args.model_name)
 hparams = model.default_hparams()
 with open(os.path.join('engines/gpt-2/models', args.model_name, 'hparams.json')) as f:
     hparams.override_from_dict(json.load(f))
 
 if args.sample_length > hparams.n_ctx:
-    raise ValueError(
-        "Can't get samples longer than window size: %s" % hparams.n_ctx)
+    raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
 
 if args.model_name == '345M':
     args.memory_saving_gradients = True
@@ -120,79 +133,80 @@ def build_input_from_segments2(info, history, response):
 
     return sequence
 
-#
-# scrape tweet
-#
+def scrape_tweet (tweet_url):
 
-page = requests.get(args.tweet_url)
+    page = requests.get(tweet_url)
 
-soup = BeautifulSoup(page.content, 'html.parser')
+    soup = BeautifulSoup(page.content, 'html.parser')
 
-ps = soup.find_all('p', class_='js-tweet-text')
-tweet_text = ''
-info_url = ''
-for c in ps[0].children:
+    ps = soup.find_all('p', class_='js-tweet-text')
+    tweet_text = ''
+    info_url = ''
+    for c in ps[0].children:
 
-    logging.debug('child: %s' % c)
-    if isinstance(c, str):
-        tweet_text += c
-    elif c.has_attr('data-expanded-url'):
-        if 'http' in c['data-expanded-url']:
-            info_url = c['data-expanded-url']
-    elif c.has_attr('href'):
-        if (not info_url) and ('http' in c['href']):
-            info_url = c['href']
+        logging.debug('child: %s' % c)
+        if isinstance(c, str):
+            tweet_text += c
+        elif c.has_attr('data-expanded-url'):
+            if 'http' in c['data-expanded-url']:
+                info_url = c['data-expanded-url']
+        elif c.has_attr('href'):
+            if (not info_url) and ('http' in c['href']):
+                info_url = c['href']
+            else:
+                tweet_text += ' ' + c.get_text()
         else:
-            tweet_text += ' ' + c.get_text()
+            tweet_text += c.get_text()
+
+    logging.info('tweet text: %s, info_url: %s' % (tweet_text, info_url))
+
+    #
+    # retrieve article, if any
+    #
+
+    info_text = None
+    if info_url:
+        
+        response = requests.get(info_url, verify=True, timeout=7)
+        # response.text
+        doc = Document(response.text)
+        doc.title()
+        html = doc.summary()
+
+        # html
+
+        soup = BeautifulSoup(html, features="lxml")
+
+        # kill all script and style elements
+        for script in soup(["script", "style"]):
+            script.extract()    # rip it out
+
+        # get text
+        text = soup.get_text()
+
+        # break into lines and remove leading and trailing space on each
+        lines = (line.strip() for line in text.splitlines())
+        # break multi-headlines into a line each
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        # drop blank lines
+        info_text = '\n'.join(chunk for chunk in chunks if chunk)
+
+        logging.info('info_text: %s' % info_text)
+
+        if 'Auf deiner Timeline findest du in Echtzeit die Informationen, die dir wichtig sind.' in info_text:
+            info_text=None
+
+    if info_text:
+        question_tokens = build_input_from_segments2(enc.encode(info_text), [], enc.encode(tweet_text))
     else:
-        tweet_text += c.get_text()
+        question_tokens = build_input_from_segments2(enc.encode(tweet_text), [], None)
 
-logging.info('tweet text: %s, info_url: %s' % (tweet_text, info_url))
+    logging.info('question_tokens     : %s', question_tokens)
+    logging.info('question_tokens len : %s', len(question_tokens))
+    logging.info('sample_length       : %s', args.sample_length)
 
-#
-# retrieve article, if any
-#
+    return question_tokens
 
-info_text = None
-if info_url:
-    
-    response = requests.get(info_url, verify=True, timeout=7)
-    # response.text
-    doc = Document(response.text)
-    doc.title()
-    html = doc.summary()
-
-    # html
-
-    soup = BeautifulSoup(html, features="lxml")
-
-    # kill all script and style elements
-    for script in soup(["script", "style"]):
-        script.extract()    # rip it out
-
-    # get text
-    text = soup.get_text()
-
-    # break into lines and remove leading and trailing space on each
-    lines = (line.strip() for line in text.splitlines())
-    # break multi-headlines into a line each
-    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-    # drop blank lines
-    info_text = '\n'.join(chunk for chunk in chunks if chunk)
-
-    logging.info('info_text: %s' % info_text)
-
-    if 'Auf deiner Timeline findest du in Echtzeit die Informationen, die dir wichtig sind.' in info_text:
-        info_text=None
-
-if info_text:
-    question_tokens = build_input_from_segments2(enc.encode(info_text), [], enc.encode(tweet_text))
-else:
-    question_tokens = build_input_from_segments2(enc.encode(tweet_text), [], None)
-
-logging.info('question_tokens     : %s', question_tokens)
-logging.info('question_tokens len : %s', len(question_tokens))
-logging.info('sample_length       : %s', args.sample_length)
 
 BATCH_SIZE = 1
 
@@ -210,10 +224,10 @@ with tf.compat.v1.Session(config=config) as sess:
                                         temperature  = 1.0,
                                         top_k        = 40)
 
-    all_vars = [v for v in tf.trainable_variables() if 'model' in v.name]
+    all_vars = [v for v in tf.compat.v1.trainable_variables() if 'model' in v.name]
 
     saver = tf.compat.v1.train.Saver( var_list    = all_vars )
-    sess.run(tf.global_variables_initializer())
+    sess.run(tf.compat.v1.global_variables_initializer())
 
     if args.restore_from == 'latest':
         ckpt = tf.train.latest_checkpoint(os.path.join(CHECKPOINT_DIR, args.run_name))
@@ -229,13 +243,19 @@ with tf.compat.v1.Session(config=config) as sess:
     logging.info('Loading checkpoint %s ...', ckpt)
     saver.restore(sess, ckpt)
 
-    logging.info ('question       : %s ', enc.decode(question_tokens))
-    logging.info ('question length: %s ', len(question_tokens))
+    while (True):
 
-    out = sess.run( tf_sample, feed_dict = { context: [ question_tokens ] })
-    answer = enc.decode(out[0])
+        tweet_url = input('Tweet URL: ')
 
-    for a in answer.split('<|speaker')[1:]:
+        question_tokens = scrape_tweet(tweet_url)
 
-        print ('answer     : %s' % a)
+        logging.info ('question       : %s ', enc.decode(question_tokens))
+        logging.info ('question length: %s ', len(question_tokens))
+
+        out = sess.run( tf_sample, feed_dict = { context: [ question_tokens ] })
+        answer = enc.decode(out[0])
+
+        for a in answer.split('<|speaker')[1:]:
+
+            print ('answer     : %s' % a)
 
