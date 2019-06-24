@@ -25,8 +25,8 @@ import time
 import json
 import logging
 import requests
-from readability import Document
-from bs4 import BeautifulSoup
+
+from newspaper import Article
 
 from optparse import OptionParser
 from nltools  import misc
@@ -35,15 +35,14 @@ import twint
 
 PROC_TITLE        = 'qa_extract_twitter'
 
-TWITTER_DUMPFN    = '/home/bofh/projects/ai/data/corpora/en/twitter/corpus/d2/6a/d26a633de579000.json'
-TWITTER_CORPUSFN  = '/home/bofh/projects/ai/data/corpora/en/twitter/corpus'
+TWITTER_CORPUSDIR = '/home/bofh/projects/ai/data/corpora/en/twitter'
 
-TWITTER_DIRFN     = 'data/qa_src/twitter'
+QASRC_DIRFN       = 'data/qa_src'
 
-# DEBUG_LIMIT       = 100
+# DEBUG_LIMIT       = 10
 DEBUG_LIMIT       = 0
 
-BLOCKLIST         = ['wapo.st', 'washingtonpost.com']
+BLOCKLIST         = ['wapo.st', 'washingtonpost.com', 'twitter.com']
 
 #
 # init
@@ -55,7 +54,7 @@ misc.init_app(PROC_TITLE)
 # commandline
 #
 
-parser = OptionParser("usage: %prog [options]")
+parser = OptionParser("usage: %prog [options] corpus")
 
 parser.add_option ("-v", "--verbose", action="store_true", dest="verbose",
                    help="verbose output")
@@ -69,19 +68,20 @@ else:
 
 # readability.readability
 
-logging.getLogger("readability").setLevel(logging.WARNING)
-# logging.getLogger("urllib3").setLevel(logging.WARNING)
+# logging.getLogger("readability").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
+if len(args) != 1:
+    parser.print_usage()
+    sys.exit(1)
+
+corpus_name = args[0]
 
 #
 # cleanup / preparation
 #
  
-# cmd = 'rm -rf %s' % QA_DIRFN
-# logging.info(cmd)
-# os.system(cmd)
- 
-cmd = 'mkdir -p %s' % TWITTER_DIRFN
+cmd = 'mkdir -p %s/%s' % (QASRC_DIRFN, corpus_name)
 logging.info(cmd)
 os.system(cmd)
 
@@ -91,29 +91,22 @@ os.system(cmd)
 
 ls_files = []
 
-for ls_a in os.listdir(TWITTER_CORPUSFN):
-    for ls_b in os.listdir('%s/%s' % (TWITTER_CORPUSFN, ls_a)):
-        for ls_f in os.listdir('%s/%s/%s' % (TWITTER_CORPUSFN, ls_a, ls_b)):
-            ls_files.append('%s/%s/%s/%s' % (TWITTER_CORPUSFN, ls_a, ls_b, ls_f))
+for ls_a in os.listdir('%s/%s' % (TWITTER_CORPUSDIR, corpus_name)):
 
-            if len(ls_files) % 100 == 0:
-                logging.info ('%7d files...' % len(ls_files))
+    ls_files.append('%s/%s/%s' % (TWITTER_CORPUSDIR, corpus_name, ls_a))
 
-            if DEBUG_LIMIT and (len(ls_files)>=DEBUG_LIMIT):
-                logging.warning('DEBUG_LIMIT reached at %d files.' % len(ls_files))
-                break
-        if DEBUG_LIMIT and (len(ls_files)>=DEBUG_LIMIT):
-            break
+    if len(ls_files) % 100 == 0:
+        logging.info ('%7d files...' % len(ls_files))
+
     if DEBUG_LIMIT and (len(ls_files)>=DEBUG_LIMIT):
+        logging.warning('DEBUG_LIMIT reached at %d files.' % len(ls_files))
         break
 
 logging.info('found %d files.' % len(ls_files))
 
 #
-# load tweets
+# convert tweets
 #
-
-ls_files
 
 fncnt=0
 for twitter_dumpfn in ls_files:
@@ -126,7 +119,7 @@ for twitter_dumpfn in ls_files:
         if len(data['comments'])==0:
             continue
 
-        jsonfn = '%s/%s.json' % (TWITTER_DIRFN, data['id'])
+        jsonfn = '%s/%s/%s.json' % (QASRC_DIRFN, corpus_name, data['id'])
         if os.path.exists(jsonfn):
             continue
 
@@ -144,38 +137,21 @@ for twitter_dumpfn in ls_files:
                 continue
 
             logging.info ('%7d/%7d %s %s ... ' % (fncnt, len(ls_files), data['user'], url))
-            response = requests.get(url, verify=True, timeout=7)
-            # response.text
-            doc = Document(response.text)
-            doc.title()
-            html = doc.summary()
 
-            # html
+            article = Article(url)
+            article.download()
+            article.parse()
 
-            soup = BeautifulSoup(html)
+            text = article.text
 
-            # kill all script and style elements
-            for script in soup(["script", "style"]):
-                script.extract()    # rip it out
-
-            # get text
-            text = soup.get_text()
-
-            # break into lines and remove leading and trailing space on each
-            lines = (line.strip() for line in text.splitlines())
-            # break multi-headlines into a line each
-            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-            # drop blank lines
-            text = '\n'.join(chunk for chunk in chunks if chunk)
-
-            # text
+            # print (text)
 
         # text
 
         if text:
-            ds = {'info': text, 'dlg': [data['text']]}
+            ds = {'info': text, 'date': data['date'], 'dlg': [data['text']]}
         else:
-            ds = {'info': data['text'], 'dlg': []}
+            ds = {'info': data['text'], 'date': data['date'], 'dlg': []}
 
         fav = 0
         for c in data['comments']:
@@ -196,7 +172,4 @@ for twitter_dumpfn in ls_files:
 
     except:
         logging.exception('exception caught %s' % repr(data))
-
-ds
-data
 
