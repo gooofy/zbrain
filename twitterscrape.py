@@ -35,7 +35,7 @@ from nltools  import misc
 
 PROC_TITLE        = 'twitterscrape'
 
-TWITTER_CORPUS    = '/home/bofh/projects/ai/data/corpora/en/twitter/corpus'
+TWITTER_CORPUSDIR = '/home/bofh/projects/ai/data/corpora/en/twitter'
 USER_STAT_FN      = '/home/bofh/projects/ai/data/corpora/en/twitter/user_stats.json'
 
 DEFAULT_MAX_TWEETS = 0
@@ -46,7 +46,7 @@ DEFAULT_UNTIL      = ''
 DEFAULT_NEAR       = ''
 DEFAULT_WITHIN     = ''
 
-MAX_DUPES          = 512
+MAX_DUPES          = 64
 
 #
 # init
@@ -58,7 +58,7 @@ misc.init_app(PROC_TITLE)
 # commandline
 #
 
-parser = OptionParser("usage: %prog [options] user [ user2 ... ]")
+parser = OptionParser("usage: %prog [options] corpus twitter_sources.txt")
 
 parser.add_option ("-m", "--max_tweets", dest="max_tweets", type = "int", default=DEFAULT_MAX_TWEETS,
                    help="maximum number of tweets to scrape, default: %d" % DEFAULT_MAX_TWEETS)
@@ -91,19 +91,22 @@ if options.verbose:
 else:
     logging.getLogger().setLevel(logging.INFO)
 
-logging.getLogger().setLevel(logging.DEBUG)
-
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+if len(args) != 2:
+    parser.print_usage()
+    sys.exit(1)
+
+corpus_name     = args[0]
+twitter_sources = args[1]
 
 #
 # corpus preparation
 #
 
-for i in range(256):
-    for j in range(256):
-        dirfn = '%s/%02x/%02x' % (TWITTER_CORPUS, i, j)
-        misc.mkdirs(dirfn)
+dirfn = '%s/%s' % (TWITTER_CORPUSDIR, corpus_name)
+misc.mkdirs(dirfn)
 
 user_stats = {}
 
@@ -361,99 +364,98 @@ def scrapePage(page, session, isComment=False):
 # main
 #
 
-for search_user in args:
+with open(twitter_sources, 'r') as tsf:
+    for line in tsf:
+        search_user = line.strip()
 
-    total_tweets     = 0
-    total_items      = 0
+        total_tweets     = 0
+        total_items      = 0
 
-    cursor           = ''
-    sess             = requests.Session()
-    cnt_blank        = 0
-    pre_cursors      = collections.deque(3 * [""], 3)
-    empty_cursor_cnt = 0
+        cursor           = ''
+        sess             = requests.Session()
+        cnt_blank        = 0
+        pre_cursors      = collections.deque(3 * [""], 3)
+        empty_cursor_cnt = 0
 
-    dupes            = 0
+        dupes            = 0
 
-    while (options.max_tweets == 0) or (total_tweets < options.max_tweets):
+        while (options.max_tweets == 0) or (total_tweets < options.max_tweets):
 
-        page = scrapeStatusPage(cursor, sess, 
-                                options.lang,
-                                search_user,
-                                options.query,
-                                options.since,
-                                options.until,
-                                options.near,
-                                options.within)
+            page = scrapeStatusPage(cursor, sess, 
+                                    options.lang,
+                                    search_user,
+                                    options.query,
+                                    options.since,
+                                    options.until,
+                                    options.near,
+                                    options.within)
 
 
-        # print page
-        cnt_c, has_more, cursor, page_tweets = scrapePage(page, isComment=False, session=sess)
+            # print page
+            cnt_c, has_more, cursor, page_tweets = scrapePage(page, isComment=False, session=sess)
 
-        if len(page_tweets) == 0:
-            cnt_blank += 1
-        if len(page_tweets) > 0:
-            cnt_blank = 0
-        if cnt_blank > 3:
-            logging.error('Too many blank pages, terminating this search.')
-            break
-        total_tweets += len(page_tweets)
-        total_items  += cnt_c + len(page_tweets)
+            if len(page_tweets) == 0:
+                cnt_blank += 1
+            if len(page_tweets) > 0:
+                cnt_blank = 0
+            if cnt_blank > 3:
+                logging.error('Too many blank pages, terminating this search.')
+                break
+            total_tweets += len(page_tweets)
+            total_items  += cnt_c + len(page_tweets)
 
-        for tweet in page_tweets:
-            plink    = tweet['permalink']
-            parts    = plink.split('/')
-            
-            tweet_id = '%0x' % (int(parts[len(parts)-1]))
+            for tweet in page_tweets:
+                plink    = tweet['permalink']
+                parts    = plink.split('/')
+                
+                tweet_id = '%0x' % (int(parts[len(parts)-1]))
 
-            tweet_id_a = tweet_id[0:2]
-            tweet_id_b = tweet_id[2:4]
+                jsonfn = '%s/%s/%s.json' % (TWITTER_CORPUSDIR, corpus_name, tweet_id)
 
-            jsonfn = '%s/%s/%s/%s.json' % (TWITTER_CORPUS, tweet_id_a, tweet_id_b, tweet_id)
+                # logging.debug('writing: %s', jsonfn)
 
-            # logging.debug('writing: %s', jsonfn)
+                if os.path.exists(jsonfn):
+                    dupes += 1
+                else:
+                    dupes = 0
 
-            if os.path.exists(jsonfn):
-                dupes += 1
+                with open(jsonfn, 'w') as jsonf:
+                    jsonf.write(json.dumps(tweet))
+
+            logging.info('%6d tweets from this iteration, total tweets: %6d dupes: %d' % (len(page_tweets),         total_tweets, dupes))
+            logging.info('%6d items  from this iteration, total items:  %6d          ' % (cnt_c + len(page_tweets), total_items ))
+
+            #
+            # print top user stats
+            #
+
+            cnt = 0
+            for user, likes in sorted(user_stats.items(), key=lambda x: x[1], reverse=True):
+                logging.info('%7d likes by %s' % (likes, user))
+                cnt += 1
+                if cnt >= 10:
+                    break
+
+            with open(USER_STAT_FN, 'w') as user_stat_f:
+                user_stat_f.write(json.dumps(user_stats))
+
+            if len(cursor.strip()) > 0:
+                if cursor in pre_cursors:
+                    logging.info("No more tweets coming back, terminating the search.")
+                    break
+                else:
+                    pre_cursors.append(cursor)
+                    empty_cursor_cnt = 0
             else:
-                dupes = 0
+                empty_cursor_cnt += 1
 
-            with open(jsonfn, 'w') as jsonf:
-                jsonf.write(json.dumps(tweet))
-
-        logging.info('%6d tweets from this iteration, total tweets: %6d dupes: %d' % (len(page_tweets),         total_tweets, dupes))
-        logging.info('%6d items  from this iteration, total items:  %6d          ' % (cnt_c + len(page_tweets), total_items ))
-
-        #
-        # print top user stats
-        #
-
-        cnt = 0
-        for user, likes in sorted(user_stats.items(), key=lambda x: x[1], reverse=True):
-            logging.info('%7d likes by %s' % (likes, user))
-            cnt += 1
-            if cnt >= 10:
+            if empty_cursor_cnt > 4:
+                logging.error("Too many empty cursors coming back, terminating the search.")
                 break
 
-        with open(USER_STAT_FN, 'w') as user_stat_f:
-            user_stat_f.write(json.dumps(user_stats))
-
-        if len(cursor.strip()) > 0:
-            if cursor in pre_cursors:
-                logging.info("No more tweets coming back, terminating the search.")
+            if dupes > MAX_DUPES:
+                logging.warn("too many dupes, terminating the search.")
                 break
-            else:
-                pre_cursors.append(cursor)
-                empty_cursor_cnt = 0
-        else:
-            empty_cursor_cnt += 1
-
-        if empty_cursor_cnt > 4:
-            logging.error("Too many empty cursors coming back, terminating the search.")
-            break
-
-        if dupes > MAX_DUPES:
-            logging.warn("too many dupes, terminating the search.")
-            break
 
 
 
