@@ -24,14 +24,15 @@ import codecs
 import time
 import json
 import logging
-import requests
+import hashlib
+import tqdm
+import random
 
-from newspaper import Article
-
-from optparse import OptionParser
-from nltools  import misc
-
-import twint
+import newspaper
+from newspaper       import Article
+from multiprocessing import Pool
+from optparse        import OptionParser
+from nltools         import misc
 
 PROC_TITLE        = 'qa_extract_twitter'
 
@@ -42,8 +43,25 @@ QASRC_DIRFN       = 'data/qa_src'
 # DEBUG_LIMIT       = 10
 DEBUG_LIMIT       = 0
 
-BLOCKLIST         = ['wapo.st', 'washingtonpost.com', 'twitter.com']
+BLOCKLIST         = ['wapo.st', 'washingtonpost.com', 'twitter.com', 'tagesspiegel.de']
 
+NUM_PROCS         = 32
+
+USER_AGENTS = ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.80 Safari/537.36',
+               'Mozilla/5.0 (Linux; Android 8.0.0; SM-G930F Build/R16NW; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/74.0.3729.157 Mobile Safari/537.36',
+               'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36',
+               'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/74.0.3729.157 Safari/537.36',
+               'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/6.0)',
+               'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; WOW64; Trident/6.0)',
+               'Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; wbx 1.0.0; rv:11.0) like Gecko',
+               'Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko',
+               'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:67.0) Gecko/20100101 Firefox/67.0',
+               'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0',
+               'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:64.0) Gecko/20100101 Firefox/64.0',
+               'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:63.0) Gecko/20100101 Firefox/63.0',
+               'Mozilla/5.0 (Windows NT 6.2; rv:63.0) Gecko/20100101 Firefox/63.0',
+               'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:62.0) Gecko/20100101 Firefox/62.0'
+               'Opera/9.80 (Windows NT 6.1; WOW64) Presto/2.12.388 Version/12.18']
 #
 # init
 #
@@ -102,26 +120,24 @@ for ls_a in os.listdir('%s/%s' % (TWITTER_CORPUSDIR, corpus_name)):
         logging.warning('DEBUG_LIMIT reached at %d files.' % len(ls_files))
         break
 
-logging.info('found %d files.' % len(ls_files))
+logging.info('found %d files. shuffling...' % len(ls_files))
+random.shuffle(ls_files)
+logging.info('found %d files. shuffling... done.' % len(ls_files))
 
 #
 # convert tweets
 #
 
-fncnt=0
-for twitter_dumpfn in ls_files:
-
-    fncnt += 1
-
+def convert_tweet(twitter_dumpfn):
     try:
         with open(twitter_dumpfn, 'r') as dumpf:
             data = json.loads(dumpf.read())
         if len(data['comments'])==0:
-            continue
+            return
 
         jsonfn = '%s/%s/%s.json' % (QASRC_DIRFN, corpus_name, data['id'])
         if os.path.exists(jsonfn):
-            continue
+            return
 
         url = data['textUrl'] if 'textUrl' in data else ''
 
@@ -134,11 +150,14 @@ for twitter_dumpfn in ls_files:
                 if blocked_url in url:
                     skip = True
             if skip:
-                continue
+               return 
 
-            logging.info ('%7d/%7d %s %s ... ' % (fncnt, len(ls_files), data['user'], url))
+            logging.debug ('%-20s: %s ... ' % (data['user'], url))
 
-            article = Article(url)
+            config = newspaper.Config()
+            config.browser_user_agent = random.choice(USER_AGENTS)
+
+            article = Article(url=url, config=config)
             article.download()
             article.parse()
 
@@ -161,15 +180,26 @@ for twitter_dumpfn in ls_files:
             fav += 1
 
         if (not text) and (fav == 0):
-            continue
+            return
 
         # print(repr(ds))
 
         with open(jsonfn, 'w') as jsonf:
             jsonf.write(json.dumps(ds))
 
-        logging.info ('%7d/%7d %s written. %s %s' % (fncnt, len(ls_files), jsonfn, data['user'], url[:30]))
+        logging.debug ('%-20s: %s written. %s' % (data['user'], jsonfn, url[:30]))
+
+    except newspaper.article.ArticleException as ae:
+        
+        logging.info ('%-20s: %s' % (data['user'], str(ae)))
 
     except:
         logging.exception('exception caught %s' % repr(data))
+
+
+
+with Pool(NUM_PROCS) as p:
+
+    for _ in tqdm.tqdm(p.imap_unordered(convert_tweet, ls_files), total=len(ls_files)):
+        pass
 
