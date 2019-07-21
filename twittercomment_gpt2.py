@@ -35,7 +35,7 @@ import tensorflow as tf
 from tensorflow.core.protobuf import rewriter_config_pb2
 from gpt2                     import model, sample, encoder
 
-CHECKPOINT_DIR     = 'engines/gpt-2/checkpoint'
+CHECKPOINT_DIR     = 'engines/gpt-2/checkpoint345M'
 SAMPLE_DIR         = 'samples'
 
 MAX_TOKENS         = 384
@@ -46,7 +46,7 @@ parser = argparse.ArgumentParser( description='generate twitter comments using a
 
 # parser.add_argument('tweet_url', metavar='TWEETURL', type=str, help='Tweet URL')
 
-parser.add_argument('--model_name', metavar='MODEL', type=str, default='117M', help='Pretrained model name')
+parser.add_argument('--model_name', metavar='MODEL', type=str, default='345M', help='Pretrained model name')
 parser.add_argument('--restore_from', type=str, default='latest', help='Either "latest", "fresh", or a path to a checkpoint file')
 parser.add_argument('--run_name', type=str, default='run1', help='Run id. Name of subdirectory in checkpoint/ and samples/')
 parser.add_argument('--sample_length', metavar='TOKENS', type=int, default=500, help='Sample this many tokens')
