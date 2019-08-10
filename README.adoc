@@ -1,4 +1,31 @@
 
+Workflow
+========
+
+Pretraining
+-----------
+
+./qa_export_transformer-lm.py -o base_de heise parole twitter_de_2010 twitter_de_201907 wikipedia_de
+
+TODO: encode corpus
+      pretrain
+
+QA Training
+-----------
+
+TODO: export skills
+
+./qa_export_transformer-lm.py -q -o qa_de twitter_de_2010 twitter_de_201907 skill_personal_de
+
+TODO: encode corpus
+      train
+
+TODO: KB encoding / indexing / lookup
+-------------------------------------
+
+FIXME
+
+
 Architecture
 ============
 
@@ -151,6 +178,9 @@ Knowledge
 AI Architecture Survey
 ----------------------
 
+* scalable:
+    * XL-Net
+    * Transformer XL
 * OpenAI GPT-2
     * How to build a State-of-the-Art Conversational AI with Transfer Learning
       https://medium.com/huggingface/how-to-build-a-state-of-the-art-conversational-ai-with-transfer-learning-2d818ac26313
