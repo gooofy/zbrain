@@ -22,7 +22,8 @@ parser = argparse.ArgumentParser( description='Chat with your GPT-2 model.', for
 parser.add_argument('--model_name', metavar='MODEL', type=str, default='345M', help='Pretrained model name')
 
 parser.add_argument('--run_name', type=str, default='run1', help='Run id. Name of subdirectory in checkpoint/ and samples/')
-parser.add_argument('--sample_length', metavar='TOKENS', type=int, default=1023, help='Sample this many tokens')
+# parser.add_argument('--sample_length', metavar='TOKENS', type=int, default=1023, help='Sample this many tokens')
+parser.add_argument('--sample_length', metavar='TOKENS', type=int, default=500, help='Sample this many tokens')
 
 
 args = parser.parse_args()
