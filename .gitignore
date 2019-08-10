@@ -12,6 +12,7 @@ lib64
 data/fasttext/
 data/kb/
 data/training/
+data/qa_src/
 share/
 src
 research/
