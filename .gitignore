@@ -16,3 +16,5 @@ data/qa_src/
 share/
 src
 research/
+engines
+pip-selfcheck.json
