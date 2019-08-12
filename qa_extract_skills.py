@@ -153,7 +153,7 @@ for skillfn in skillfns:
     root = ET.fromstring(skillxml.render())
 
     for node in root.findall('./info[@lang=\'%s\']' % options.lang):
-        infotxt = root.find('info').text.strip()
+        infotxt = node.text.strip()
 
     for dlg in root.findall('./dlg[@lang=\'%s\']' % options.lang):
 
