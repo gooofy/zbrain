@@ -33,7 +33,7 @@ from common import alphabet
 PROC_TITLE                 = 'qa_export_transformer-lm'
 
 QASRC_DIRFN                = 'data/qa_src'
-TLM_DIRFN                  = 'engines/transformer-lm/data'
+TLM_DIRFN                  = '../transformer-lm/data'
 
 DEFAULT_OUTPUT_CORPUS_NAME = 'lm_corpus'
 
