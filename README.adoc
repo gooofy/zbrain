@@ -1,24 +1,99 @@
+Zamia Brain
+===========
 
-Workflow
-========
+The Zamia Brain project provides infrastructure useful to create natural
+language processing systems based on transformer networks (see
+https://arxiv.org/abs/1706.03762).
 
-Pretraining
------------
+This project is still highly experimental, everything is subject to change
+without prior notice. The current approach is to generate training
+corpora for pre-training as well as (multi-)domain refinement. The goal
+is to train networks that are very robust (i.e. avoid brittleness 
+present in traditional rule-based systems) in their natural language
+processing capabilities (pretraining) while allowing for a certain amount of
+control of their behavior (refinement).
 
+For this, you will find these components:
+
+* scripts to generate pre-training corpora, typically using web scraping techniques
+  as well as scripts that adapt scientific copora for training
+  (https://github.com/gooofy/zamia-brain)
+* scripts that generate corpora from patterns ("skills") for refinement
+  (https://github.com/gooofy/zamia-brain)
+* A GPT-2 implementation along with tokenization, training and inference tools 
+  (https://github.com/gooofy/transformer-lm)
+* A TransformerXL implementation along with tokenization, training and inference tools 
+  (https://github.com/gooofy/transformer-xl)
+* Pre-trained models 
+  (https://goofy.zamia.org/zamia-speech/brain/)  
+
+Corpora
+=======
+
+Twitter
+-------
+
+You will need to provide a list of accounts as input:
+
+[source,bash]
+----
+./twitterscrape.py -l de -s 2019-08-01 twitter_de_201908 -U user_stats_de.json twitter_sources_de.txt
+----
+
+Heise
+-----
+Important: adapt hard-coded paths firs!
+[source,bash]
+----
+./qa_extract_heise.py
+----
+
+Parole
+------
+Important: adapt hard-coded paths firs!
+[source,bash]
+----
+./qa_extract_parole.py
+----
+
+Wikipedia
+---------
+Important: adapt hard-coded paths firs!
+[source,bash]
+----
+./qa_extract_wikipedia.py -l de
+----
+
+Export for pretraining
+----------------------
+
+This will work for GPT-2 as well as TransformerXL:
+[source,bash]
+----
 ./qa_export_transformer-lm.py -o base_de heise parole twitter_de_2010 twitter_de_201907 wikipedia_de
+----
 
-TODO: encode corpus
-      pretrain
+Next, encode corpus the corpus using a sentencepiece tokenization model and run the pretraining.
 
-QA Training
------------
+Extract skills from Zamia AI
+----------------------------
 
-TODO: export skills
+[source,bash]
+----
+qa_extract_skills.py -l de skill_personal_de personal.xml 
+----
 
+QA finetuning
+-------------
+
+-q option is important here to include dialog samples
+
+[source,bash]
+----
 ./qa_export_transformer-lm.py -q -o qa_de twitter_de_2010 twitter_de_201907 skill_personal_de
+----
 
-TODO: encode corpus
-      train
+Next, encode corpus the corpus using a sentencepiece tokenization model and continue the training for finetuning.
 
 TODO: KB encoding / indexing / lookup
 -------------------------------------
@@ -29,8 +104,10 @@ FIXME
 Architecture
 ============
 
-Open Domain QA Chat Bot
+This is just a sketch of what a full QA chat bot with associative memory could look like:
 
+[ditaa]
+----
                         +------------------+                                                        +------------------------------+
                         | Dialog Ctx     1 |                                                        |       Knowledge Base         |
                         | Dialog Ctx     2 |           +--------------------+                       +------------------------------+
@@ -89,22 +166,22 @@ Open Domain QA Chat Bot
 
 [ Knowledge + Dialog History + Current Input ] -> [ Response ]
 
+----
 
 Knowledge Base
 --------------
 
-
-
 Dialog
 ------
 
+<pre>
 DS_i -> data/qa_src/DS_i/#########.json  \
 DS_j -> data/qa_src/DS_j/#########.json  | 
      .                                    \  data/qa_enc/train/#########.json
      .                                    /  data/qa_enc/val/#########.json
      .                                   |
 DS_n -> data/qa_src/DS_n/#########.json  /
-
+</pre>
 
 
 
@@ -189,7 +266,6 @@ AI Architecture Survey
 
     * OpenWebText https://github.com/jcpeterson/openwebtext
       https://pushshift.io/  http://files.pushshift.io/reddit/
- 
 * BERT
   https://arxiv.org/pdf/1901.08634.pdf
 * How does TF's universal sentence encoder work?

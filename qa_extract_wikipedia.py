@@ -181,7 +181,7 @@ misc.init_app(PROC_TITLE)
 # commandline
 #
 
-parser = OptionParser("usage: %prog [options] foo.txt [bar.txt ...]")
+parser = OptionParser("usage: %prog [options]")
 
 parser.add_option ("-l", "--lang", dest="lang", type = "str", default=DEFAULT_LANG,
                    help="language, default: %s" % DEFAULT_LANG)
