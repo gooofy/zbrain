@@ -17,9 +17,9 @@ For this, you will find these components:
 
 * scripts to generate pre-training corpora, typically using web scraping techniques
   as well as scripts that adapt scientific copora for training
-  (https://github.com/gooofy/zamia-brain)
+  (https://github.com/gooofy/zbrain)
 * scripts that generate corpora from patterns ("skills") for refinement
-  (https://github.com/gooofy/zamia-brain)
+  (https://github.com/gooofy/zbrain)
 * A GPT-2 implementation along with tokenization, training and inference tools 
   (https://github.com/gooofy/transformer-lm)
 * A TransformerXL implementation along with tokenization, training and inference tools 
